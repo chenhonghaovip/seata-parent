@@ -73,4 +73,8 @@ public class SeataAutoConfiguration {
     public SeataAutoDataSourceProxyCreator seataAutoDataSourceProxyCreator(SeataProperties seataProperties) {
         return new SeataAutoDataSourceProxyCreator(seataProperties.isUseJdkProxy(),seataProperties.getExcludesForAutoProxying());
     }
+
+    public static void main(String[] args) {
+        System.out.println(5%2);
+    }
 }

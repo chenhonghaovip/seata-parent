@@ -32,7 +32,9 @@ public class RMClient {
      */
     public static void init(String applicationId, String transactionServiceGroup) {
         RmRpcClient rmRpcClient = RmRpcClient.getInstance(applicationId, transactionServiceGroup);
+        // DefaultResourceManager该类中指定了了提交和回滚的方法
         rmRpcClient.setResourceManager(DefaultResourceManager.get());
+        // 是个接收server消息并做对应提交或者回滚操作的回调处理类
         rmRpcClient.setTransactionMessageHandler(DefaultRMHandler.get());
         rmRpcClient.init();
     }

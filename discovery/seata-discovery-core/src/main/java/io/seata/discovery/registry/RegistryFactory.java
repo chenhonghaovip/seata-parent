@@ -15,16 +15,16 @@
  */
 package io.seata.discovery.registry;
 
-import java.util.Objects;
-
 import io.seata.common.exception.NotSupportYetException;
 import io.seata.common.loader.EnhancedServiceLoader;
 import io.seata.config.ConfigurationFactory;
 import io.seata.config.ConfigurationKeys;
 
+import java.util.Objects;
+
 /**
  * The type Registry factory.
- *
+ * 典型的线程安全的懒加载单例创建工厂模式
  * @author slievrly
  */
 public class RegistryFactory {

@@ -15,6 +15,13 @@
  */
 package io.seata.common.loader;
 
+import io.seata.common.Constants;
+import io.seata.common.executor.Initialize;
+import io.seata.common.util.CollectionUtils;
+import org.apache.commons.lang.exception.ExceptionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -27,13 +34,6 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
-
-import io.seata.common.Constants;
-import io.seata.common.executor.Initialize;
-import io.seata.common.util.CollectionUtils;
-import org.apache.commons.lang.exception.ExceptionUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * The type Enhanced service loader.
@@ -200,7 +200,7 @@ public class EnhancedServiceLoader {
         private final ConcurrentMap<String, List<ExtensionDefinition>> nameToDefinitionsMap = new ConcurrentHashMap<>();
         private final ConcurrentMap<Class<?>, ExtensionDefinition> classToDefinitionMap = new ConcurrentHashMap<>();
 
-        private InnerEnhancedServiceLoader(Class<S> type) {
+        public InnerEnhancedServiceLoader(Class<S> type) {
             this.type = type;
         }
 

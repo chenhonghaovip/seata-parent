@@ -27,11 +27,7 @@ import io.seata.common.exception.FrameworkErrorCode;
 import io.seata.common.exception.FrameworkException;
 import io.seata.common.thread.NamedThreadFactory;
 import io.seata.common.util.NetUtil;
-import io.seata.core.protocol.AbstractMessage;
-import io.seata.core.protocol.HeartbeatMessage;
-import io.seata.core.protocol.MergedWarpMessage;
-import io.seata.core.protocol.MessageFuture;
-import io.seata.core.protocol.RpcMessage;
+import io.seata.core.protocol.*;
 import io.seata.core.rpc.RemotingClient;
 import io.seata.core.rpc.TransactionMessageHandler;
 import io.seata.core.rpc.processor.Pair;
@@ -43,12 +39,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 import java.util.List;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.*;
 import java.util.function.Function;
 
 import static io.seata.common.exception.FrameworkErrorCode.NoAvailableService;
@@ -276,6 +267,12 @@ public abstract class AbstractRpcRemotingClient extends AbstractRpcRemoting impl
     @Sharable
     class ClientHandler extends ChannelDuplexHandler {
 
+        /**
+         * 监听 服务器 发送来的数据
+         * @param ctx
+         * @param msg
+         * @throws Exception Exception
+         */
         @Override
         public void channelRead(final ChannelHandlerContext ctx, Object msg) throws Exception {
             if (!(msg instanceof RpcMessage)) {

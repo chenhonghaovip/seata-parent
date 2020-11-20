@@ -15,9 +15,6 @@
  */
 package io.seata.server.lock;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import io.seata.common.XID;
 import io.seata.common.util.CollectionUtils;
 import io.seata.common.util.StringUtils;
@@ -27,6 +24,9 @@ import io.seata.core.lock.RowLock;
 import io.seata.server.session.BranchSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * The type Abstract lock manager.
@@ -45,12 +45,14 @@ public abstract class AbstractLockManager implements LockManager {
         if (branchSession == null) {
             throw new IllegalArgumentException("branchSession can't be null for memory/file locker.");
         }
+        // 得到本分支事务需要加锁的记录和表名，RM将要加锁的记录主键值和表名组装成字符串发送到TC
         String lockKey = branchSession.getLockKey();
         if (StringUtils.isNullOrEmpty(lockKey)) {
             // no lock
             return true;
         }
         // get locks of branch
+        // 创建RowLock集合，RowLock对象表示要加锁的表及主键中字段的值，一条加锁记录一个RowLock对象
         List<RowLock> locks = collectRowLocks(branchSession);
         if (CollectionUtils.isEmpty(locks)) {
             // no lock

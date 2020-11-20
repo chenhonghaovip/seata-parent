@@ -15,9 +15,6 @@
  */
 package io.seata.server.coordinator;
 
-import java.io.IOException;
-import java.util.concurrent.TimeoutException;
-
 import io.seata.core.exception.BranchTransactionException;
 import io.seata.core.exception.GlobalTransactionException;
 import io.seata.core.exception.TransactionException;
@@ -39,12 +36,10 @@ import io.seata.server.session.SessionHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static io.seata.core.exception.TransactionExceptionCode.BranchTransactionNotExist;
-import static io.seata.core.exception.TransactionExceptionCode.FailedToAddBranch;
-import static io.seata.core.exception.TransactionExceptionCode.GlobalTransactionNotActive;
-import static io.seata.core.exception.TransactionExceptionCode.GlobalTransactionStatusInvalid;
-import static io.seata.core.exception.TransactionExceptionCode.FailedToSendBranchCommitRequest;
-import static io.seata.core.exception.TransactionExceptionCode.FailedToSendBranchRollbackRequest;
+import java.io.IOException;
+import java.util.concurrent.TimeoutException;
+
+import static io.seata.core.exception.TransactionExceptionCode.*;
 
 /**
  * The type abstract core.
@@ -68,14 +63,22 @@ public abstract class AbstractCore implements Core {
     @Override
     public Long branchRegister(BranchType branchType, String resourceId, String clientId, String xid,
                                String applicationData, String lockKeys) throws TransactionException {
+        // 通过全局事务id获取全局事务session,如果获取不到，抛出异常
         GlobalSession globalSession = assertGlobalSessionNotNull(xid, false);
+        // 1、lockAndExecute方法中要对GlobalSession对象上锁
         return SessionHolder.lockAndExecute(globalSession, () -> {
+            // 全局session检查，判断当前全局globalSession是否活跃，状态是否为begin,否则抛出异常
             globalSessionStatusCheck(globalSession);
+            // todo 添加监听器，后续专门文章解析
             globalSession.addSessionLifecycleListener(SessionHolder.getRootSessionManager());
+            // 创建分支会话BranchSession对象
             BranchSession branchSession = SessionHelper.newBranchByGlobal(globalSession, branchType, resourceId,
                     applicationData, lockKeys, clientId);
+            // 2、对事务修改记录进行上锁（rowKey = resourceId(这里的resourceId默认为jdbcUrl) + table_name + primary_key）
             branchSessionLock(globalSession, branchSession);
             try {
+                // 设置分支事务状态为BranchStatus.Registered，并且将该分支事务添加到GlobalSession中,同时会触发监听事件机制
+                // 向branch_table写入注册数据
                 globalSession.addBranch(branchSession);
             } catch (RuntimeException ex) {
                 branchSessionUnlock(branchSession);
@@ -87,6 +90,7 @@ public abstract class AbstractCore implements Core {
                 LOGGER.info("Register branch successfully, xid = {}, branchId = {}, resourceId = {} ,lockKeys = {}",
                     globalSession.getXid(), branchSession.getBranchId(), resourceId, lockKeys);
             }
+            // 返回分支事务id
             return branchSession.getBranchId();
         });
     }

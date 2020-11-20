@@ -15,10 +15,6 @@
  */
 package io.seata.rm.datasource;
 
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.util.concurrent.Callable;
-
 import io.seata.common.util.StringUtils;
 import io.seata.config.ConfigurationFactory;
 import io.seata.core.constants.ConfigurationKeys;
@@ -34,9 +30,11 @@ import io.seata.rm.datasource.undo.UndoLogManagerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static io.seata.core.constants.DefaultValues.DEFAULT_CLIENT_LOCK_RETRY_POLICY_BRANCH_ROLLBACK_ON_CONFLICT;
-import static io.seata.core.constants.DefaultValues.DEFAULT_CLIENT_REPORT_RETRY_COUNT;
-import static io.seata.core.constants.DefaultValues.DEFAULT_CLIENT_REPORT_SUCCESS_ENABLE;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.concurrent.Callable;
+
+import static io.seata.core.constants.DefaultValues.*;
 
 /**
  * The type Connection proxy.
@@ -192,6 +190,7 @@ public class ConnectionProxy extends AbstractConnectionProxy {
     }
 
     private void doCommit() throws SQLException {
+        // 提交时，需要判断是否为全局事务或者加了全局事务锁
         if (context.inGlobalTransaction()) {
             processGlobalTransactionCommit();
         } else if (context.isGlobalLockRequire()) {
@@ -213,21 +212,27 @@ public class ConnectionProxy extends AbstractConnectionProxy {
 
     private void processGlobalTransactionCommit() throws SQLException {
         try {
+            // 注册分支事务register()，并将branchId分支id绑定到上下文中
             register();
         } catch (TransactionException e) {
             recognizeLockKeyConflictException(e, context.buildLockKeys());
         }
         try {
+            // 插入到undo_log表中
             UndoLogManagerFactory.getUndoLogManager(this.getDbType()).flushUndoLogs(this);
+            // 提交本地事务
             targetConnection.commit();
         } catch (Throwable ex) {
             LOGGER.error("process connectionProxy commit error: {}", ex.getMessage(), ex);
             report(false);
             throw new SQLException(ex);
         }
+        // 如果分支事务正常注册、且本地事务提交，同时开启了通知
         if (IS_REPORT_SUCCESS_ENABLE) {
+            // 广播分支事务提交正常
             report(true);
         }
+        // 清除当前ConnectionProxy中的xid、branchId、undoLog buffer之类的，本次提交结束
         context.reset();
     }
 

@@ -15,15 +15,15 @@
  */
 package io.seata.server.storage.db.lock;
 
-import java.util.List;
-import javax.sql.DataSource;
-
 import io.seata.common.exception.DataAccessException;
 import io.seata.common.exception.StoreException;
 import io.seata.common.util.CollectionUtils;
 import io.seata.core.lock.AbstractLocker;
 import io.seata.core.lock.RowLock;
 import io.seata.core.store.LockStore;
+
+import javax.sql.DataSource;
+import java.util.List;
 
 /**
  * The type Data base locker.
@@ -56,6 +56,7 @@ public class DataBaseLocker extends AbstractLocker {
             return true;
         }
         try {
+            // 向lock_table表中插入所记录信息
             return lockStore.acquireLock(convertToLockDO(locks));
         } catch (StoreException e) {
             throw e;
@@ -100,6 +101,7 @@ public class DataBaseLocker extends AbstractLocker {
             return true;
         }
         try {
+            // 删除lock_table中的对应的记录信息，通过全局事务id和分支事务id
             return lockStore.unLock(xid, branchIds);
         } catch (StoreException e) {
             throw e;

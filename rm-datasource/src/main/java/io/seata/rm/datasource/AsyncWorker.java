@@ -15,20 +15,6 @@
  */
 package io.seata.rm.datasource;
 
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-
 import io.seata.common.exception.NotSupportYetException;
 import io.seata.common.exception.ShouldNeverHappenException;
 import io.seata.common.thread.NamedThreadFactory;
@@ -42,6 +28,11 @@ import io.seata.rm.DefaultResourceManager;
 import io.seata.rm.datasource.undo.UndoLogManagerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.*;
+import java.util.concurrent.*;
 
 import static io.seata.core.constants.ConfigurationKeys.CLIENT_ASYNC_COMMIT_BUFFER_LIMIT;
 import static io.seata.core.constants.DefaultValues.DEFAULT_CLIENT_ASYNC_COMMIT_BUFFER_LIMIT;
@@ -173,6 +164,7 @@ public class AsyncWorker implements ResourceManagerInbound {
                     int maxSize = Math.max(xids.size(), branchIds.size());
                     if (maxSize == UNDOLOG_DELETE_LIMIT_SIZE) {
                         try {
+                            // 批量删除undo_log记录
                             UndoLogManagerFactory.getUndoLogManager(dataSourceProxy.getDbType()).batchDeleteUndoLog(
                                 xids, branchIds, conn);
                         } catch (Exception ex) {

@@ -16,8 +16,8 @@
 package io.seata.rm.datasource.exec;
 
 import io.seata.common.loader.EnhancedServiceLoader;
-import io.seata.common.util.StringUtils;
 import io.seata.common.util.CollectionUtils;
+import io.seata.common.util.StringUtils;
 import io.seata.core.context.RootContext;
 import io.seata.core.model.BranchType;
 import io.seata.rm.datasource.StatementProxy;
@@ -68,12 +68,13 @@ public class ExecuteTemplate {
                                                      StatementProxy<S> statementProxy,
                                                      StatementCallback<T, S> statementCallback,
                                                      Object... args) throws SQLException {
-
+        // 判断是否需要被代理执行，如果不在全局事务中，按照普通的statement执行
         if (!shouldExecuteInATMode()) {
             // Just work as original statement
             return statementCallback.execute(statementProxy.getTargetStatement(), args);
         }
 
+        // 判断数据库类型并且对sql进行解析处理
         String dbType = statementProxy.getConnectionProxy().getDbType();
         if (CollectionUtils.isEmpty(sqlRecognizers)) {
             sqlRecognizers = SQLVisitorFactory.get(
@@ -109,6 +110,7 @@ public class ExecuteTemplate {
                 executor = new MultiExecutor<>(statementProxy, statementCallback, sqlRecognizers);
             }
         }
+        // 执行sql,并返回执行结果
         T rs;
         try {
             rs = executor.execute(args);

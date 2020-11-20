@@ -27,30 +27,8 @@ import io.seata.core.exception.TransactionException;
 import io.seata.core.model.GlobalStatus;
 import io.seata.core.protocol.AbstractMessage;
 import io.seata.core.protocol.AbstractResultMessage;
-import io.seata.core.protocol.transaction.AbstractTransactionRequestToTC;
-import io.seata.core.protocol.transaction.AbstractTransactionResponse;
-import io.seata.core.protocol.transaction.BranchRegisterRequest;
-import io.seata.core.protocol.transaction.BranchRegisterResponse;
-import io.seata.core.protocol.transaction.BranchReportRequest;
-import io.seata.core.protocol.transaction.BranchReportResponse;
-import io.seata.core.protocol.transaction.GlobalBeginRequest;
-import io.seata.core.protocol.transaction.GlobalBeginResponse;
-import io.seata.core.protocol.transaction.GlobalCommitRequest;
-import io.seata.core.protocol.transaction.GlobalCommitResponse;
-import io.seata.core.protocol.transaction.GlobalLockQueryRequest;
-import io.seata.core.protocol.transaction.GlobalLockQueryResponse;
-import io.seata.core.protocol.transaction.GlobalReportRequest;
-import io.seata.core.protocol.transaction.GlobalReportResponse;
-import io.seata.core.protocol.transaction.GlobalRollbackRequest;
-import io.seata.core.protocol.transaction.GlobalRollbackResponse;
-import io.seata.core.protocol.transaction.GlobalStatusRequest;
-import io.seata.core.protocol.transaction.GlobalStatusResponse;
-import io.seata.core.protocol.transaction.UndoLogDeleteRequest;
-import io.seata.core.rpc.ChannelManager;
-import io.seata.core.rpc.Disposable;
-import io.seata.core.rpc.RemotingServer;
-import io.seata.core.rpc.RpcContext;
-import io.seata.core.rpc.TransactionMessageHandler;
+import io.seata.core.protocol.transaction.*;
+import io.seata.core.rpc.*;
 import io.seata.core.rpc.netty.RpcServer;
 import io.seata.server.AbstractTCInboundHandler;
 import io.seata.server.event.EventBusManager;
@@ -188,6 +166,8 @@ public class DefaultCoordinator extends AbstractTCInboundHandler implements Tran
     @Override
     protected void doBranchRegister(BranchRegisterRequest request, BranchRegisterResponse response,
                                     RpcContext rpcContext) throws TransactionException {
+        // 分支事务注册，TC生成一个分支ID，并返回到RM
+        // 下面要调用DefaultCore的branchRegister方法
         response.setBranchId(
             core.branchRegister(request.getBranchType(), request.getResourceId(), rpcContext.getClientId(),
                 request.getXid(), request.getApplicationData(), request.getLockKey()));
@@ -338,6 +318,7 @@ public class DefaultCoordinator extends AbstractTCInboundHandler implements Tran
                     continue;
                 }
                 asyncCommittingSession.addSessionLifecycleListener(SessionHolder.getRootSessionManager());
+                // 做全局事务提交操作
                 core.doGlobalCommit(asyncCommittingSession, true);
             } catch (TransactionException ex) {
                 LOGGER.error("Failed to async committing [{}] {} {}", asyncCommittingSession.getXid(), ex.getCode(), ex.getMessage(), ex);
@@ -372,7 +353,7 @@ public class DefaultCoordinator extends AbstractTCInboundHandler implements Tran
     }
 
     /**
-     * Init.
+     * Init. 初始化定时任务线程池
      */
     public void init() {
         retryRollbacking.scheduleAtFixedRate(() -> {
@@ -391,6 +372,9 @@ public class DefaultCoordinator extends AbstractTCInboundHandler implements Tran
             }
         }, 0, COMMITTING_RETRY_PERIOD, TimeUnit.MILLISECONDS);
 
+        /*
+         * 异步二阶段提交线程池
+         */
         asyncCommitting.scheduleAtFixedRate(() -> {
             try {
                 handleAsyncCommitting();

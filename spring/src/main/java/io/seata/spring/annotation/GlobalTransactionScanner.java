@@ -15,10 +15,6 @@
  */
 package io.seata.spring.annotation;
 
-import java.lang.reflect.Method;
-import java.util.HashSet;
-import java.util.Set;
-
 import io.seata.common.util.CollectionUtils;
 import io.seata.common.util.StringUtils;
 import io.seata.config.ConfigurationChangeListener;
@@ -47,6 +43,10 @@ import org.springframework.beans.factory.InitializingBean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.context.ConfigurableApplicationContext;
+
+import java.lang.reflect.Method;
+import java.util.HashSet;
+import java.util.Set;
 
 import static io.seata.core.constants.DefaultValues.DEFAULT_DISABLE_GLOBAL_TRANSACTION;
 
@@ -210,7 +210,7 @@ public class GlobalTransactionScanner extends AbstractAutoProxyCreator
                 } else {
                     Class<?> serviceInterface = SpringProxyUtils.findTargetClass(bean);
                     Class<?>[] interfacesIfJdk = SpringProxyUtils.findInterfaces(bean);
-
+                    // 判断当前bean类或者方法上是否存在@GlobalTransactional,不存在时，说明不需要代理
                     if (!existsAnnotation(new Class[]{serviceInterface})
                         && !existsAnnotation(interfacesIfJdk)) {
                         return bean;
@@ -218,6 +218,7 @@ public class GlobalTransactionScanner extends AbstractAutoProxyCreator
 
                     if (interceptor == null) {
                         if (globalTransactionalInterceptor == null) {
+                            // 创建拦截器
                             globalTransactionalInterceptor = new GlobalTransactionalInterceptor(failureHandlerHook);
                             ConfigurationFactory.getInstance().addConfigListener(ConfigurationKeys.DISABLE_GLOBAL_TRANSACTION, (ConfigurationChangeListener) globalTransactionalInterceptor);
                         }

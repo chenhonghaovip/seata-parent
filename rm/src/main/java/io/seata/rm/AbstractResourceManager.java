@@ -15,8 +15,6 @@
  */
 package io.seata.rm;
 
-import java.util.concurrent.TimeoutException;
-
 import io.seata.common.exception.NotSupportYetException;
 import io.seata.core.exception.RmTransactionException;
 import io.seata.core.exception.TransactionException;
@@ -31,9 +29,10 @@ import io.seata.core.protocol.transaction.BranchRegisterResponse;
 import io.seata.core.protocol.transaction.BranchReportRequest;
 import io.seata.core.protocol.transaction.BranchReportResponse;
 import io.seata.core.rpc.netty.RmRpcClient;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.TimeoutException;
 
 /**
  * abstract ResourceManager

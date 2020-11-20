@@ -15,13 +15,6 @@
  */
 package io.seata.server.coordinator;
 
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import io.seata.common.exception.NotSupportYetException;
 import io.seata.common.loader.EnhancedServiceLoader;
 import io.seata.common.util.CollectionUtils;
@@ -38,6 +31,12 @@ import io.seata.server.session.BranchSession;
 import io.seata.server.session.GlobalSession;
 import io.seata.server.session.SessionHelper;
 import io.seata.server.session.SessionHolder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The type Default core.
@@ -94,6 +93,7 @@ public class DefaultCore implements Core {
     @Override
     public Long branchRegister(BranchType branchType, String resourceId, String clientId, String xid,
                                String applicationData, String lockKeys) throws TransactionException {
+        // AT模式下branchType为AT，getCore方法返回的是ATCore对象
         return getCore(branchType).branchRegister(branchType, resourceId, clientId, xid,
                 applicationData, lockKeys);
     }
@@ -136,6 +136,12 @@ public class DefaultCore implements Core {
         return session.getXid();
     }
 
+    /**
+     * 同步删除锁记录信息，异步执行二阶段提交（删除RM本地的undo_log，删除TC的global_table和branch_table记录信息）
+     * @param xid XID of the global transaction.
+     * @return GlobalStatus
+     * @throws TransactionException TransactionException
+     */
     @Override
     public GlobalStatus commit(String xid) throws TransactionException {
         GlobalSession globalSession = SessionHolder.findGlobalSession(xid);
@@ -144,26 +150,34 @@ public class DefaultCore implements Core {
         }
         globalSession.addSessionLifecycleListener(SessionHolder.getRootSessionManager());
         // just lock changeStatus
-
+        // 全局事务提交
         boolean shouldCommit = SessionHolder.lockAndExecute(globalSession, () -> {
             // the lock should release after branch commit
             // Highlight: Firstly, close the session, then no more branch can be registered.
+            // 清除全局事务信息，主要为删除lock_table表中相关信息，以便于下次进行加锁处理操作
             globalSession.closeAndClean();
+            // 判断当前的全局事务状态，如果为begin时，修改状态为committing,且返回true,否则返回false
             if (globalSession.getStatus() == GlobalStatus.Begin) {
                 globalSession.changeStatus(GlobalStatus.Committing);
                 return true;
             }
             return false;
         });
+        // 如果当前全局事务session状态不！=begin时，返回事务状态,表示禁止全局事务提交，事务提交失败
         if (!shouldCommit) {
             return globalSession.getStatus();
         }
+        // 遍历分支事务是否可以异步提交，如果分支事务有TCC或者XA的，则不能异步提交
+        // 本文介绍的场景都是AT模式的，因此globalSession.canBeCommittedAsync()返回true
+        // 判断是否异步提交二阶段事务
         if (globalSession.canBeCommittedAsync()) {
             globalSession.asyncCommit();
             return GlobalStatus.Committed;
         } else {
+            // 执行同步提交
             doGlobalCommit(globalSession, false);
         }
+        // 返回最终事务状态
         return globalSession.getStatus();
     }
 
@@ -184,10 +198,12 @@ public class DefaultCore implements Core {
                     continue;
                 }
                 try {
+                    // 进行二阶段事务提交，向各个RM发送请求，进行对undo_log的删除操作
                     BranchStatus branchStatus = getCore(branchSession.getBranchType()).branchCommit(globalSession, branchSession);
 
                     switch (branchStatus) {
                         case PhaseTwo_Committed:
+                            // 删除分支事务记录
                             globalSession.removeBranch(branchSession);
                             continue;
                         case PhaseTwo_CommitFailed_Unretryable:
@@ -230,6 +246,7 @@ public class DefaultCore implements Core {
             }
         }
         if (success) {
+            // 删除全局事务记录
             SessionHelper.endCommitted(globalSession);
 
             // committed event

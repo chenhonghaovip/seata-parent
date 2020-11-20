@@ -15,15 +15,6 @@
  */
 package io.seata.server.session;
 
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-
 import io.seata.common.Constants;
 import io.seata.common.XID;
 import io.seata.common.util.StringUtils;
@@ -39,6 +30,15 @@ import io.seata.server.store.SessionStorable;
 import io.seata.server.store.StoreConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * The type Global session.
@@ -212,7 +212,9 @@ public class GlobalSession implements SessionLifecycle, SessionStorable {
      * @throws TransactionException the transaction exception
      */
     public void closeAndClean() throws TransactionException {
+        // 设置全局事务globalSession的active = false
         close();
+        // 清除各个分支事务的全局锁
         clean();
 
     }
@@ -238,6 +240,7 @@ public class GlobalSession implements SessionLifecycle, SessionStorable {
     @Override
     public void addBranch(BranchSession branchSession) throws TransactionException {
         for (SessionLifecycleListener lifecycleListener : lifecycleListeners) {
+            // 触发监听事件，此时会向branch_table表中写入分支数据，表示分支注册
             lifecycleListener.onAddBranch(this, branchSession);
         }
         branchSession.setStatus(BranchStatus.Registered);
@@ -647,8 +650,11 @@ public class GlobalSession implements SessionLifecycle, SessionStorable {
     }
 
     public void asyncCommit() throws TransactionException {
+        // 添加监听器
         this.addSessionLifecycleListener(SessionHolder.getAsyncCommittingSessionManager());
+        // 将当前全局事务添加到异步提交管理器，异步提交管理器后续文章介绍
         SessionHolder.getAsyncCommittingSessionManager().addGlobalSession(this);
+        // 修改事务状态为异步提交中
         this.changeStatus(GlobalStatus.AsyncCommitting);
     }
 

@@ -15,22 +15,22 @@
  */
 package io.seata.server.session;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-
-import io.seata.server.storage.file.lock.FileLocker;
 import io.seata.common.util.CompressUtil;
 import io.seata.core.exception.TransactionException;
 import io.seata.core.model.BranchStatus;
 import io.seata.core.model.BranchType;
 import io.seata.server.lock.LockerManagerFactory;
+import io.seata.server.storage.file.lock.FileLocker;
 import io.seata.server.store.SessionStorable;
 import io.seata.server.store.StoreConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * The type Branch session.
@@ -270,6 +270,7 @@ public class BranchSession implements Lockable, Comparable<BranchSession>, Sessi
 
     @Override
     public boolean lock() throws TransactionException {
+        // 当为AT模式时，执行尝试加锁操作，否则返回true
         if (this.getBranchType().equals(BranchType.AT)) {
             return LockerManagerFactory.getLockManager().acquireLock(this);
         }

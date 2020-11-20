@@ -16,11 +16,6 @@
 package io.seata.rm.datasource.exec;
 
 
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.List;
-import java.util.concurrent.Callable;
-
 import io.seata.rm.datasource.AbstractConnectionProxy;
 import io.seata.rm.datasource.ConnectionContext;
 import io.seata.rm.datasource.ConnectionProxy;
@@ -29,6 +24,11 @@ import io.seata.rm.datasource.sql.struct.TableRecords;
 import io.seata.sqlparser.SQLRecognizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.List;
+import java.util.concurrent.Callable;
 
 /**
  * The type Abstract dml base executor.
@@ -83,9 +83,13 @@ public abstract class AbstractDMLBaseExecutor<T, S extends Statement> extends Ba
      * @throws Exception the exception
      */
     protected T executeAutoCommitFalse(Object[] args) throws Exception {
+        // 1、获取sql执行前镜像
         TableRecords beforeImage = beforeImage();
+        // 2、执行sql
         T result = statementCallback.execute(statementProxy.getTargetStatement(), args);
+        // 3、获取sql执行后镜像afterimage
         TableRecords afterImage = afterImage(beforeImage);
+        // 4、根据beforeImage，afterImage生成undolog记录并添加到connectionProxy的上下文中
         prepareUndoLog(beforeImage, afterImage);
         return result;
     }
@@ -102,7 +106,9 @@ public abstract class AbstractDMLBaseExecutor<T, S extends Statement> extends Ba
         try {
             connectionProxy.setAutoCommit(false);
             return new LockRetryPolicy(connectionProxy).execute(() -> {
+                // 执行非自动提交的事务,此时会生成undo_log记录，但是还未入库
                 T result = executeAutoCommitFalse(args);
+                // 执行完成后，进行事务提交操作，顺便提交undo_log
                 connectionProxy.commit();
                 return result;
             });
